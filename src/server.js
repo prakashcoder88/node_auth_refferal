@@ -1,3 +1,5 @@
+
+
 const http = require('http');
 const url = require('url');
 const mongoose = require('mongoose');
@@ -5,7 +7,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
 const PORT = process.env.PORT || 3000;
-const secretKey = process.env.SECRET_KEY || 'yourSecretKey'; // Use environment variables for sensitive data
+const secretKey = process.env.SECRET_KEY || 'dshfghdf3456dfg43534dfg43rgdfp09'; 
 
 mongoose.connect('mongodb://localhost:27017/mydb', {
   useNewUrlParser: true,
@@ -26,13 +28,13 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'POST' && pathname === '/api/register') {
     try {
-      // Implement input validation for username and password
+      
       const body = await getRequestBody(req);
       const { username, password } = JSON.parse(body);
 
       const existingUser = await User.findOne({ username });
       if (existingUser) {
-        return sendResponse(res, 400, 'Username already exists');
+        return message(res, 400, 'Username already exists');
       }
 
       const salt = await bcrypt.genSalt(10);
@@ -44,10 +46,10 @@ const server = http.createServer(async (req, res) => {
       });
 
       await user.save();
-      return sendResponse(res, 201, 'User registered successfully');
+      return message(res, 201, 'User registered successfully');
     } catch (error) {
       console.error('Error registering user:', error);
-      return sendResponse(res, 500, 'Error registering user');
+      return message(res, 500, 'Error registering user');
     }
   } else if (req.method === 'POST' && pathname === '/api/login') {
     try {
@@ -56,71 +58,75 @@ const server = http.createServer(async (req, res) => {
 
       const user = await User.findOne({ username });
       if (!user) {
-        return sendResponse(res, 400, 'Username or password is incorrect');
+        return message(res, 400, 'Username or password is incorrect');
       }
-
+      if (user.isDeleted) {
+        return message(res, 400, 'account is not active');
+      }
       const validPassword = await bcrypt.compare(password, user.password);
       if (!validPassword) {
-        return sendResponse(res, 400, 'Username or password is incorrect');
+        return message(res, 400, 'Username or password is incorrect');
       }
 
       const token = jwt.sign({ _id: user._id }, secretKey, { expiresIn: '1h' }); 
-      res.setHeader('Content-Type', 'application/json');
+
       res.setHeader('auth-token', token);
-      return sendResponse(res, 200, JSON.stringify({ token }));
+      return message(res, 200, JSON.stringify({ token }));
     } catch (error) {
       console.error('Error logging in:', error);
-      return sendResponse(res, 500, 'Error logging in');
+      return message(res, 500, 'Error logging in');
     }
-  } else if (req.method === 'GET' && pathname === '/api/resource') {
+  } else if (req.method === 'GET' && pathname === '/api/userfind') {
     const token = req.headers['auth-token'];
     if (!token) {
-      return sendResponse(res, 401, 'Access denied');
+      return message(res, 401, 'Access denied');
     }
 
     try {
       const decoded = jwt.verify(token, secretKey);
       const user = await User.findById(decoded._id);
       if (!user) {
-        return sendResponse(res, 401, 'Access denied');
+        return message(res, 401, 'Access denied');
       }
 
-      return sendResponse(res, 200, JSON.stringify({ message: 'Protected resource', user }));
+      return message(res, 200, JSON.stringify({ message: 'Protected resource', user }));
     } catch (error) {
       console.error('Invalid token:', error);
-      return sendResponse(res, 401, 'Invalid token');
+      return message(res, 401, 'Invalid token');
     }
-  } else if (req.method === 'PUT' && pathname.startsWith('/api/update/')) {
+  } else if (req.method === 'PATCH' && pathname.startsWith('/api/update')) {
     try {
       const userId = pathname.split('/').pop();
       const body = await getRequestBody(req);
       const { username } = JSON.parse(body);
-  
-      // Check if a valid token is provided in the request header
+
+
       const token = req.headers['auth-token'];
       if (!token) {
-        return sendResponse(res, 401, 'Access denied');
+        return message(res, 401, 'Access denied');
       }
   
-      // Verify the token and find the user
+
       try {
         const decoded = jwt.verify(token, secretKey);
         const user = await User.findById(decoded._id);
+      
         if (!user) {
-          return sendResponse(res, 401, 'Access denied');
+          return message(res, 401, 'Access denied');
         }
       } catch (error) {
         console.error('Invalid token:', error);
-        return sendResponse(res, 401, 'Invalid token');
+        return message(res, 401, 'Invalid token');
       }
   
-      // Check if the new username already exists
-      const existingUser = await User.findOne({ username });
+    
+      const existingUser = await User.findOne( {username} );
+      console.log(existingUser);
       if (existingUser) {
-        return sendResponse(res, 400, 'Username already exists');
+        return message(res, 400, 'Username already exists');
       }
-  
-      // Update the user's username
+ 
+    
       const updatedUser = await User.findByIdAndUpdate(
         userId,
         { $set: { username } },
@@ -128,13 +134,13 @@ const server = http.createServer(async (req, res) => {
       );
   
       if (!updatedUser) {
-        return sendResponse(res, 404, JSON.stringify({ error: 'User not found' }));
+        return message(res, 404, JSON.stringify({ error: 'User not found' }));
       }
   
-      return sendResponse(res, 200, JSON.stringify(updatedUser));
+      return message(res, 200, JSON.stringify(updatedUser));
     } catch (error) {
       console.error('Internal Server Error:', error);
-      return sendResponse(res, 500, JSON.stringify({ error: 'Internal Server Error' }));
+      return message(res, 500, JSON.stringify({ error: 'Internal Server Error' }));
     }
   }
   
@@ -148,16 +154,16 @@ const server = http.createServer(async (req, res) => {
       );
 
       if (!softDeletedUser) {
-        return sendResponse(res, 404, JSON.stringify({ error: 'User not found' }));
+        return message(res, 404, JSON.stringify({ error: 'User not found' }));
       }
 
-      return sendResponse(res, 200, JSON.stringify({ message: 'User soft-deleted successfully' }));
+      return message(res, 200, JSON.stringify({ message: 'User soft-deleted successfully' }));
     } catch (error) {
       console.error('Internal Server Error:', error);
-      return sendResponse(res, 500, JSON.stringify({ error: 'Internal Server Error' }));
+      return message(res, 500, JSON.stringify({ error: 'Internal Server Error' }));
     }
   } else {
-    return sendResponse(res, 404, 'Not Found');
+    return message(res, 404, 'Not Found');
   }
 });
 
@@ -179,9 +185,9 @@ function getRequestBody(req) {
   });
 }
 
-function sendResponse(res, statusCode, message) {
+function message(res, statusCode, message) {
   res.statusCode = statusCode;
-  res.setHeader('Content-Type', 'application/json');
+
   res.end(message);
 }
 
